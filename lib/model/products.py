@@ -11,11 +11,19 @@ from ..helper.database import DatabaseHelper
 class Product(Model):
     """ Model for product """
     def __init__(self, **kwargs):
+        self._id = kwargs.get("_id", None)
         self.barcode = kwargs.get("barcode", None)
         self.name = kwargs.get("name", None)
-        self.prices = kwargs.get("prices", [])
+        self.prices = kwargs.get("prices", None)
         self.suplier = kwargs.get("suplier", None)
         self.department = kwargs.get("department", None)
+
+        if isinstance(self.prices, list):
+            self.prices = [Price(**price) for price in self.prices]
+        if isinstance(self.suplier, str):
+            self.suplier = Suplier(code=self.suplier)
+        if isinstance(self.department, str):
+            self.department = Department(code=self.department)
 
     def to_dict(self):
         """ Convert to dictionary object """
@@ -27,10 +35,14 @@ class Product(Model):
         if self.department is not None:
             department_code = self.department.code
 
+        prices = []
+        if self.prices is not None:
+            prices = self.prices
+
         document = {
             "barcode": self.barcode,
             "name": self.name,
-            "prices": [price.to_dict() for price in self.prices],
+            "prices": [price.to_dict() for price in prices],
             "suplier": suplier_code,
             "department": department_code
         }
@@ -62,6 +74,7 @@ class Product(Model):
         result = Product()
         result.barcode = self.barcode
         result.name = document["name"]
+        result.prices = []
         for price in document["prices"]:
             result.prices.append(Price(
                 value=price["value"], min_qty=price["minQty"]

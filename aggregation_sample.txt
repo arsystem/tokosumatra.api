@@ -1,0 +1,87 @@
+db.groups.aggregate([
+	{$match: {}},
+	{$unwind: "$products"},
+	{$lookup: {
+		from: "product",
+		localField: "products.barcode",
+		foreignField: "barcode",
+		as: "productDetail"
+	}},
+	{$project: {
+		_id: 1,
+		name: 1,
+		products: {
+			barcode: 1,
+			name: {$arrayElemAt: ["$productDetail.name",0]}
+		}
+	}},
+	{$group: {
+		_id: "$_id",
+		name: {$first: "$name"},
+		products: {$push: "$products"}
+	}},
+	{$skip: 0},
+	{$limit: 10}
+]).pretty()
+
+db.sale.aggregate([
+	{$match: {
+		sales_date:{
+			$gte: new Date("2017-03-20"),
+			$lte: new Date("2017-04-20")
+
+		}
+	}},
+	{$group: {
+		_id: "$customer",
+		count: {$sum: "$qty"}
+	}},
+	{$project: {
+		_id: 1,	
+		count: 1,
+		name: {$arrayElemAt: ["$productDetail.name", 0]}
+	}},
+	{$sort: {count: -1}},
+	{$skip: 10},
+	{$limit: 10}
+])
+
+## LOOKUP FOR PRODUCT
+{$lookup: {
+	from: "product",
+	localField: "_id",
+	foreignField: "barcode",
+	as: "productDetail"
+}}
+
+db.sale.aggregate([
+	{$match: {
+		sales_date:{
+			$gte: new Date("2017-01-20"),
+			$lte: new Date("2017-04-20")
+		}
+	}},
+	{$group: {
+		_id: {id:"$product", code: "$code"}
+	}},
+	{$group: {
+		_id: "$_id.id",
+		code: {$push: "$_id.code"}
+	}},
+	{$project: {
+		_id: 1,
+		count: {$size: "$code"}
+	}},
+	{$lookup: {
+		from: "product",
+		localField: "_id",
+		foreignField: "barcode",
+		as: "productDetail"
+	}},
+	{$project: {
+		_id: 1,
+		count: 1,
+		name: {$arrayElemAt: ["$productDetail.name", 0]}
+	}},
+	{$sort: {count: -1}}
+]).pretty()

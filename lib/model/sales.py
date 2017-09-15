@@ -1,11 +1,19 @@
 """ Sales module """
 import logging
+import datetime
+
+import arrow
 
 from pymongo.errors import DuplicateKeyError
 from ..helper.database import DatabaseHelper
+from .products import Product
+from .cashier import Cashier
+from .customers import Customer
+from .departments import Department
+from .machine import Machine
+from .supliers import Suplier
+from .prices import Price
 from . import Model
-
-import arrow
 
 class Sale(Model):
     """ Model for sale """
@@ -26,11 +34,28 @@ class Sale(Model):
         self.price = kwargs.get("price", None)
         self.department = kwargs.get("department", None)
         self.suplier = kwargs.get("suplier", None)
-        self.discount_1 = kwargs.get("discount_1", None)
-        self.discount_2 = kwargs.get("discount_2", None)
-        self.discount_3 = kwargs.get("discount_3", None)
-        self.discount_4 = kwargs.get("discount_4", None)
         self.customer = kwargs.get("customer", None)
+        self.cashier = kwargs.get("cashier", None)
+        self.machine = kwargs.get("machine", None)
+
+        if isinstance(self.product, str):
+            self.product = Product(barcode=self.product)
+        if isinstance(self.price, str):
+            self.price = Price(value=int(self.price))
+        if isinstance(self.price, int):
+            self.price = Price(value=self.price)
+        if isinstance(self.price, float):
+            self.price = Price(value=int(self.price))
+        if isinstance(self.department, str):
+            self.department = Department(code=self.department)
+        if isinstance(self.suplier, str):
+            self.suplier = Suplier(code=self.suplier)
+        if isinstance(self.customer, str):
+            self.customer = Customer(code=self.customer)
+        if isinstance(self.cashier, str):
+            self.cashier = Cashier(code=self.cashier)
+        if isinstance(self.machine, str):
+            self.machine = Machine(code=self.machine)
 
     def to_dict(self):
         """ Convert to dictionary object """
@@ -54,19 +79,29 @@ class Sale(Model):
         if self.customer is not None:
             customer_code = self.customer.code
 
+        cashier_code = None
+        if self.cashier is not None:
+            cashier_code = self.cashier.code
+
+        machine_code = None
+        if self.machine is not None:
+            machine_code = self.machine.code
+
+        sales_date = self.sales_date
+        if isinstance(self.sales_date, datetime.datetime):
+            sales_date = arrow.get(self.sales_date).isoformat()
+
         return {
             "code": self.code,
-            "sales_date": self.sales_date,
+            "sales_date": sales_date,
             "product": product_barcode,
             "qty": self.qty,
             "price": price_value,
             "department": department_code,
             "suplier": suplier_code,
-            "discount_1": self.discount_1,
-            "discount_2": self.discount_2,
-            "discount_3": self.discount_3,
-            "discount_4": self.discount_4,
-            "customer": customer_code
+            "customer": customer_code,
+            "cashier": cashier_code,
+            "machine": machine_code
         }
 
     def save(self):
@@ -76,8 +111,20 @@ class Sale(Model):
             helper = DatabaseHelper()
             helper.dbase = "tokosumatra"
             helper.collection = "sale"
-            helper.indexes = [("code", "unique", )]
+            helper.indexes = [("code", "")]
             helper.insert_one(self.to_dict())
             logger.debug("Inserted or updated one sale")
         except DuplicateKeyError:
             logger.warning("Duplicate code: %s", self.code)
+
+    def get(self, code=None):
+        """ Get data from database """
+        assert code is not None, "code is not defined."
+
+        helper = DatabaseHelper()
+        helper.dbase = "tokosumatra"
+        helper.collection = "sale"
+        documents = helper.find({"code": code})
+
+        if documents is not None:
+            return [Sale(**document) for document in documents]

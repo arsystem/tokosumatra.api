@@ -1,14 +1,17 @@
 """ A module for all `Products` listeners """
 import copy
+import re
 import logging
 
+import falcon
+import pymongo
+
 from ..helper.requirements import RequirementsHelper
+from ..helper.database import DatabaseHelper
 from ..model.products import Product
 from ..model.supliers import Suplier
 from ..model.prices import Price
 from ..model.departments import Department
-
-import falcon
 
 class ProductsListener:
     """ A class for `Products` listener.
@@ -53,7 +56,53 @@ class ProductsListener:
 
     def on_get(self, req, res):
         """ Handling get requests """
-        pass
+        name = req.get_param("name")
+        barcodes = req.get_param("barcodes")
+        suplier = req.get_param("suplier")
+        department = req.get_param("department")
+        skip = req.get_param_as_int("skip") or 0
+        limit = req.get_param_as_int("limit") or 10
+        regex = req.get_param_as_bool("regex") or True
+
+        query = []
+        if name is not None:
+            if regex:
+                query.append({"name": re.compile(name, re.IGNORECASE)})
+            else:
+                query.append({"name": name})
+        if barcodes is not None:
+            query.append({"$or": [
+                {"barcode": barcode} for barcode in barcodes.split(";")
+            ]})
+        if suplier is not None:
+            query.append({"suplier": re.compile(suplier, re.IGNORECASE)})
+        if department is not None:
+            query.append({"department": re.compile(department, re.IGNORECASE)})
+
+        helper = DatabaseHelper()
+        helper.dbase = "tokosumatra"
+        helper.collection = "product"
+
+        products = []
+        try:
+            if len(query) == 0:
+                documents = helper.find({}).skip(skip).limit(limit) \
+                            .sort([("name", pymongo.ASCENDING)])
+            else:
+                documents = helper.find({"$and": query}).skip(skip).limit(limit) \
+                            .sort([("name", pymongo.ASCENDING)])
+            products = [Product(**document).to_dict() for document in documents]
+        finally:
+            helper.close()
+
+        result = {
+            "data" : products,
+            "status": {"code": 200, "message": "success"}
+        }
+        if len(products) == limit:
+            result.update({"pagination": {"next": skip + limit}})
+        req.context["result"] = result
+        res.status = falcon.HTTP_200
 
 class ProductListener:
     """ A class for `Product` listener.

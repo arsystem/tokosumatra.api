@@ -15,7 +15,7 @@ class JSONTranslator(object):
             return
         try:
             body = req.stream.read()
-            print(body)
+            # print(body)
 
             req.context['doc'] = json.loads(body.decode("utf8"))
             if not req.context['doc']:
