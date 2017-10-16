@@ -11,7 +11,7 @@ class DatabaseHelper:
         self.dbase = kwargs.get("dbase", None)
         self.collection = kwargs.get("collection", None)
         self.indexes = kwargs.get("indexes", [])
-        self.connection_string = "mongodb://frans:a123456789b@localhost/?authSource=admin"
+        self.connection_string = "mongodb://10.42.232.81"
 
     def close(self):
         """ Close connection. Necessary for manually close the connection """
